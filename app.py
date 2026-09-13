@@ -1,36 +1,34 @@
-import gradio as gr
+import streamlit as st
 from transformers import pipeline
+from PIL import Image
 
-# 1. Load the pre-trained Vision model (Downloads on first run)
-classifier = pipeline("image-classification", model="google/vit-base-patch16-224")
+# 1. Page Configuration
+st.set_page_config(page_title="AI Vision Classifier", page_icon="👁️")
+st.title("👁️ AI Vision Classifier")
+st.write("Upload an image and the AI will identify the primary subject using a Vision Transformer.")
 
-# 2. Define the prediction function
-def classify_image(image):
-    if image is None:
-        return "Please upload an image."
+# 2. Load the Vision Model (Cached so it doesn't download on every click)
+@st.cache_resource
+def load_model():
+    return pipeline("image-classification", model="google/vit-base-patch16-224")
+
+with st.spinner("Loading AI Model... (This takes a moment on the first run)"):
+    classifier = load_model()
+
+# 3. Build the UI
+uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    # Display the uploaded image
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
     
-    # Run inference on the image
-    results = classifier(image)
-    
-    # Format the top 3 predictions cleanly
-    output = ""
-    for res in results[:3]:
-        label = res['label'].capitalize()
-        confidence = round(res['score'] * 100, 1)
-        output += f"• {label}: {confidence}%\n"
+    # Run inference and display results
+    st.subheader("AI Predictions:")
+    with st.spinner("Analyzing pixels..."):
+        results = classifier(image)
         
-    return output
-
-# 3. Build the User Interface
-demo = gr.Interface(
-    fn=classify_image,
-    inputs=gr.Image(type="pil", label="Upload any photo"),
-    outputs=gr.Text(label="AI Predictions"),
-    title="👁️ AI Vision Classifier",
-    description="Upload an image and the AI will identify the primary subject using a Vision Transformer."
-    # Removed 'theme' to fix the version warning
-)
-
-# 4. Launch the app and force browser to open
-if __name__ == "__main__":
-    demo.launch(inbrowser=True)
+        for res in results[:3]:
+            label = res['label'].capitalize()
+            confidence = round(res['score'] * 100, 1)
+            st.write(f"• **{label}**: {confidence}%")
